@@ -3,7 +3,7 @@ const path = require('path')
 const fs   = require('fs')
 const net  = require('net')
 const os   = require('os')
-const { performSync, syncCovers, syncAnnotations, syncVocab } = require('./sftp')
+const { performSync, syncCovers, syncAnnotations, syncVocab, setUserData } = require('./sftp')
 const { queryDB, queryVocab } = require('./db')
 
 let settingsPath, dbPath, coversDir, annotationsPath, vocabPath
@@ -137,6 +137,7 @@ app.whenReady().then(() => {
   annotationsPath = path.join(app.getPath('userData'), 'annotations.json')
   vocabPath       = path.join(app.getPath('userData'), 'vocabulary.sqlite3')
 
+  setUserData(app.getPath('userData'))
   createWindow()
   startSyncTimer(loadSettings())
 

@@ -3,30 +3,71 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 const zlib = require('zlib')
+const { ensureKeyPair } = require('./sshkey')
 
-function makeConnOpts(settings) {
+let _userData = null
+function setUserData(p) { _userData = p }
+
+function makeConnOpts(settings, { usePassword = false } = {}) {
   const connOpts = {
     host: settings.host, port: settings.port || 2222,
     username: settings.username || 'root',
     readyTimeout: 10000, retries: 1,
   }
-  if (settings.password) {
-    connOpts.password = settings.password
+  if (usePassword) {
+    // Password auth for initial key upload — blank password works on most KOReader devices
+    connOpts.password = settings.password || ''
   } else {
-    const keyPaths = settings.sshKeyPath
-      ? [settings.sshKeyPath.replace(/^~/, os.homedir())]
-      : ['id_ed25519', 'id_rsa', 'id_ecdsa'].map(k => path.join(os.homedir(), '.ssh', k))
-    for (const kp of keyPaths) {
-      if (fs.existsSync(kp)) { connOpts.privateKey = fs.readFileSync(kp); break }
+    // Always prefer app-managed key
+    if (_userData) {
+      const { privateKey } = ensureKeyPair(_userData)
+      connOpts.privateKey = privateKey
+    }
+    // Fallback to user-specified or auto-detected system key
+    if (!connOpts.privateKey) {
+      const keyPaths = settings.sshKeyPath
+        ? [settings.sshKeyPath.replace(/^~/, os.homedir())]
+        : ['id_ed25519', 'id_rsa', 'id_ecdsa'].map(k => path.join(os.homedir(), '.ssh', k))
+      for (const kp of keyPaths) {
+        if (fs.existsSync(kp)) { connOpts.privateKey = fs.readFileSync(kp); break }
+      }
     }
   }
   return connOpts
 }
 
+// Try key auth first; if it fails, upload our public key via password auth then retry
+async function connectWithAutoSetup(sftp, settings) {
+  // First attempt: key auth
+  try {
+    await sftp.connect(makeConnOpts(settings))
+    return
+  } catch (e) {
+    if (!e.message?.includes('authentication') && !e.message?.includes('All configured') && !e.message?.includes('handshake')) throw e
+  }
+  // Key auth failed — upload our public key via password
+  const sftp2 = new SftpClient()
+  try {
+    await sftp2.connect(makeConnOpts(settings, { usePassword: true }))
+    const { publicKey } = ensureKeyPair(_userData)
+    const authKeysPath = '/mnt/us/koreader/settings/SSH/authorized_keys'
+    // Read existing keys if any, append ours if not already there
+    let existing = ''
+    try { existing = (await sftp2.get(authKeysPath)).toString() } catch {}
+    if (!existing.includes('komark')) {
+      await sftp2.put(Buffer.from(existing + publicKey), authKeysPath)
+    }
+  } finally {
+    await sftp2.end().catch(() => {})
+  }
+  // Second attempt: key auth should work now
+  await sftp.connect(makeConnOpts(settings))
+}
+
 async function performSync(settings, localPath) {
   const sftp = new SftpClient()
   try {
-    await sftp.connect(makeConnOpts(settings))
+    await connectWithAutoSetup(sftp, settings)
     const remote = settings.remotePath || '/mnt/us/koreader/settings/statistics.sqlite3'
     const tmp = localPath + '.tmp'
     await sftp.fastGet(remote, tmp)
@@ -173,7 +214,7 @@ async function syncCovers(settings, coversDir) {
   if (!fs.existsSync(coversDir)) fs.mkdirSync(coversDir, { recursive: true })
   const sftp = new SftpClient()
   try {
-    await sftp.connect(makeConnOpts(settings))
+    await connectWithAutoSetup(sftp, settings)
     const sdrFiles = await findSdrFiles(sftp, '/mnt/us/books')
 
     for (const { lua, ext } of sdrFiles) {
@@ -238,7 +279,7 @@ async function syncAnnotations(settings, annotationsPath) {
   const sftp = new SftpClient()
   const allAnnotations = []
   try {
-    await sftp.connect(makeConnOpts(settings))
+    await connectWithAutoSetup(sftp, settings)
     const sdrFiles = await findSdrFiles(sftp, '/mnt/us/books')
     for (const { lua } of sdrFiles) {
       try {
@@ -260,7 +301,7 @@ async function syncAnnotations(settings, annotationsPath) {
 async function syncVocab(settings, vocabPath) {
   const sftp = new SftpClient()
   try {
-    await sftp.connect(makeConnOpts(settings))
+    await connectWithAutoSetup(sftp, settings)
     const remote = '/mnt/us/koreader/settings/vocabulary_builder.sqlite3'
     const tmp = vocabPath + '.tmp'
     await sftp.fastGet(remote, tmp)
@@ -275,4 +316,4 @@ async function syncVocab(settings, vocabPath) {
   }
 }
 
-module.exports = { performSync, syncCovers, syncAnnotations, syncVocab }
+module.exports = { performSync, syncCovers, syncAnnotations, syncVocab, setUserData }

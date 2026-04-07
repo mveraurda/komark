@@ -22,12 +22,13 @@ function Input({ value, onChange, placeholder, type='text', mono }) {
 }
 
 export default function Settings({ onSaved }) {
-  const [form, setForm]         = useState(null)
-  const [testing, setTest]      = useState(false)
-  const [finding, setFinding]   = useState(false)
+  const [form, setForm]             = useState(null)
+  const [testing, setTest]          = useState(false)
+  const [finding, setFinding]       = useState(false)
   const [scanSubnet, setScanSubnet] = useState(null)
-  const [result, setResult]     = useState(null)
-  const [saved, setSaved]       = useState(false)
+  const [result, setResult]         = useState(null)
+  const [saved, setSaved]           = useState(false)
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   useEffect(() => {
     window.komark.getSettings().then(setForm)
@@ -43,51 +44,60 @@ export default function Settings({ onSaved }) {
     setFinding(true); setResult(null); setScanSubnet(null)
     const r = await window.komark.discoverKindle()
     setFinding(false); setScanSubnet(null)
-    if (r.ok) { set('host', r.host); setResult({ok:true, msg:`Found Kindle at ${r.host} — save settings to use it.`}) }
+    if (r.ok) { set('host', r.host); setResult({ok:true, msg:`Found device at ${r.host} — save settings to connect.`}) }
     else setResult({ok:false, msg:r.error})
   }
   async function handleTest() {
     if (!form.host) { setResult({ok:false,msg:'Enter a device IP address first.'}); return }
     setTest(true); setResult(null)
     const r = await window.komark.syncNow()
-    setTest(false); setResult({ok:r.ok,msg:r.ok?'Connected! Database synced successfully.':`Failed: ${r.error}`})
+    setTest(false); setResult({ok:r.ok,msg:r.ok?'Connected! Synced successfully.':`Failed: ${r.error}`})
     if (r.ok) onSaved?.()
   }
 
   return (
     <div className="fade-in" style={{padding:'48px',maxWidth:540,margin:'0 auto'}}>
       <h1 style={{margin:'0 0 4px'}}>Settings</h1>
-      <p style={{margin:'0 0 32px',fontSize:13,color:'var(--ink-400)'}}>Connect KoMark to your KOReader device</p>
+      <p className="muted" style={{marginBottom:32}}>Connect KoMark to your KOReader device</p>
 
-      <p style={{margin:'0 0 8px',fontSize:10,fontWeight:500,letterSpacing:'0.08em',textTransform:'uppercase',color:'var(--ink-400)'}}>Device Connection</p>
+      <p className="label">Device Connection</p>
       <hr className="divider" style={{marginBottom:20}}/>
 
-      <Field label="Device IP Address" hint="KOReader → Tools → Network → SSH Server — the IP shown there, or use Find Kindle below">
+      <Field label="Device IP Address" hint="KOReader → Tools → Network → SSH Server — use the IP shown there, or tap Find Device">
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
           <Input value={form.host} onChange={v=>set('host',v)} placeholder="e.g. 192.168.1.42" mono/>
           <button onClick={handleFind} disabled={finding} style={{flexShrink:0,padding:'8px 14px',borderRadius:6,border:'1px solid var(--cream-border)',background:'var(--cream-dark)',color:finding?'var(--ink-300)':'var(--ink-600)',fontSize:12,cursor:finding?'default':'pointer',fontFamily:'Inter,sans-serif',whiteSpace:'nowrap'}}>
-            {finding ? 'Scanning…' : 'Find Kindle'}
+            {finding ? 'Scanning…' : 'Find Device'}
           </button>
         </div>
         {finding && scanSubnet && <p style={{margin:'6px 0 0',fontSize:11,color:'var(--ink-400)',fontFamily:'ui-monospace,monospace'}}>Scanning {scanSubnet}.x…</p>}
       </Field>
-      <Field label="SSH Port" hint="Default is 2222">
-        <Input value={form.port} onChange={v=>set('port',Number(v))} placeholder="2222" mono/>
-      </Field>
-      <Field label="Username" hint="Usually 'root' on Kindle, 'root' on Kobo">
-        <Input value={form.username} onChange={v=>set('username',v)} placeholder="root" mono/>
-      </Field>
-      <Field label="Password" hint="Leave blank if not set">
-        <Input value={form.password} onChange={v=>set('password',v)} placeholder="optional" type="password" mono/>
-      </Field>
-      <Field label="SSH Key Path" hint="Leave blank to auto-detect (~/.ssh/id_ed25519, id_rsa, id_ecdsa)">
-        <Input value={form.sshKeyPath} onChange={v=>set('sshKeyPath',v)} placeholder="~/.ssh/id_ed25519" mono/>
-      </Field>
-      <Field label="Statistics File Path">
-        <Input value={form.remotePath} onChange={v=>set('remotePath',v)} placeholder="/koreader/settings/statistics.sqlite3" mono/>
+
+      <Field label="Password" hint="Only needed on first connection — KoMark sets up automatic login after that. Leave blank if your device has no password (most Kindles).">
+        <Input value={form.password} onChange={v=>set('password',v)} placeholder="leave blank if none" type="password" mono/>
       </Field>
 
-      <p style={{margin:'24px 0 8px',fontSize:10,fontWeight:500,letterSpacing:'0.08em',textTransform:'uppercase',color:'var(--ink-400)'}}>Auto-Sync</p>
+      <div style={{marginBottom:18}}>
+        <button onClick={()=>setShowAdvanced(v=>!v)} style={{background:'none',border:'none',padding:0,fontSize:12,color:'var(--ink-400)',cursor:'pointer',fontFamily:'Inter,sans-serif'}}>
+          {showAdvanced ? '▾ Hide advanced' : '▸ Advanced options'}
+        </button>
+      </div>
+
+      {showAdvanced && (
+        <>
+          <Field label="SSH Port" hint="Default is 2222">
+            <Input value={form.port} onChange={v=>set('port',Number(v))} placeholder="2222" mono/>
+          </Field>
+          <Field label="Username" hint="Usually 'root'">
+            <Input value={form.username} onChange={v=>set('username',v)} placeholder="root" mono/>
+          </Field>
+          <Field label="Statistics File Path" hint="Only change if KOReader stores files in a non-standard location">
+            <Input value={form.remotePath} onChange={v=>set('remotePath',v)} placeholder="/mnt/us/koreader/settings/statistics.sqlite3" mono/>
+          </Field>
+        </>
+      )}
+
+      <p className="label" style={{marginTop:8}}>Auto-Sync</p>
       <hr className="divider" style={{marginBottom:20}}/>
       <Field label="Sync interval">
         <select value={form.syncInterval} onChange={e=>set('syncInterval',Number(e.target.value))} style={{padding:'8px 10px',borderRadius:6,border:'1px solid var(--cream-border)',background:'var(--cream)',color:'var(--ink-900)',fontSize:13,fontFamily:'Inter,sans-serif',outline:'none',cursor:'pointer'}}>
@@ -109,7 +119,7 @@ export default function Settings({ onSaved }) {
 
       <div style={{display:'flex',gap:10}}>
         <button onClick={handleTest} disabled={testing} style={{padding:'9px 20px',borderRadius:6,border:'1px solid var(--cream-border)',background:'transparent',color:testing?'var(--ink-300)':'var(--ink-600)',fontSize:13,cursor:testing?'default':'pointer',fontFamily:'Inter,sans-serif'}}>
-          {testing?'Testing…':'Test Connection'}
+          {testing?'Connecting…':'Test Connection'}
         </button>
         <button onClick={handleSave} style={{padding:'9px 20px',borderRadius:6,border:'none',background:saved?'var(--ink-400)':'var(--amber)',color:'#fff',fontSize:13,fontWeight:500,cursor:'pointer',fontFamily:'Inter,sans-serif'}}>
           {saved?'Saved!':'Save Settings'}
