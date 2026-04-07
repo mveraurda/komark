@@ -1,0 +1,9 @@
+node_modules/
+dist/
+dist-electron/
+release/
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+.DS_Store
+assets/icon.iconset/

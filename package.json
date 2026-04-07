@@ -1,0 +1,49 @@
+{
+  "name": "komark",
+  "version": "1.0.0",
+  "description": "A reading companion for KOReader",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "build-renderer": "vite build",
+    "build-main": "rm -rf dist-electron && cp -r electron dist-electron",
+    "build": "npm run build-renderer && npm run build-main && npx electron-packager . KoMark --platform=darwin --arch=arm64 --out=release --overwrite --prune=true --icon=assets/icon.icns --ignore=\"^/src$|^/\\.git|^/release|^/scripts|^/\\.vite|^/dist/mac|^/tailwind\\.config|^/vite\\.config|^/postcss\\.config|^/index\\.html$\" && node scripts/make-dmg.js"
+  },
+  "dependencies": {
+    "date-fns": "^3.6.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "sql.js": "^1.14.1",
+    "ssh2-sftp-client": "^10.0.3"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "electron": "^24.8.8",
+    "electron-builder": "^24.13.3",
+    "electron-packager": "^17.1.2",
+    "postcss": "^8.4.39",
+    "tailwindcss": "^3.4.4",
+    "vite": "^5.3.3"
+  },
+  "build": {
+    "appId": "com.komark.app",
+    "productName": "KoMark",
+    "asar": false,
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "node_modules/**/*"
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.books"
+    }
+  }
+}

@@ -1,0 +1,62 @@
+@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;500&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --cream: #FAF7F0; --cream-dark: #F0EAE0; --cream-border: #E2D9CE;
+  --ink-900: #1C1917; --ink-700: #3D3936; --ink-600: #57534E;
+  --ink-400: #A8A29E; --ink-300: #C9C4BF; --ink-200: #E2DBD4;
+  --amber: #C4882A; --amber-light: #EDD89A; --amber-subtle: #F7EED8;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; padding: 0; }
+body {
+  background: var(--cream); color: var(--ink-900);
+  font-family: 'Inter', system-ui, sans-serif; font-size: 14px;
+  line-height: 1.6; -webkit-font-smoothing: antialiased; user-select: none;
+}
+h1,h2,h3 { font-family: 'Lora', Georgia, serif; font-weight: 500; line-height: 1.25; }
+h1 { font-size: 1.75rem; } h2 { font-size: 1.25rem; } h3 { font-size: 1rem; }
+::-webkit-scrollbar { width: 5px; } ::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--ink-300); border-radius: 9999px; }
+
+.card { background: var(--cream-dark); border: 1px solid var(--cream-border); border-radius: 6px; padding: 1.25rem; }
+.divider { border: none; border-top: 1px solid var(--cream-border); }
+.progress-track { height: 2px; background: var(--ink-200); border-radius: 9999px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--amber); border-radius: 9999px; transition: width 0.4s ease; }
+.drag-region { -webkit-app-region: drag; }
+.no-drag { -webkit-app-region: no-drag; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+.fade-in { animation: fadeIn 0.3s ease forwards; }
+.heat-0 { background: #EDE7DC; } .heat-1 { background: #D9C9B0; }
+.heat-2 { background: #C2A87A; } .heat-3 { background: #B08A4A; } .heat-4 { background: var(--amber); }
+
+/* Layout */
+.page { padding: 48px; max-width: 720px; margin: 0 auto; }
+.page--wide { padding: 48px; max-width: 800px; margin: 0 auto; }
+.page--full { padding: 48px; height: 100%; display: flex; flex-direction: column; }
+.page--narrow { padding: 48px; max-width: 680px; margin: 0 auto; }
+
+/* Typography */
+.label { font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 12px; }
+.label--no-mb { font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-400); margin: 0 0 3px; }
+.muted { font-size: 12px; color: var(--ink-400); margin: 0; }
+.muted--sm { font-size: 11px; color: var(--ink-400); margin: 0; }
+.serif-value { font-family: 'Lora', Georgia, serif; font-size: 1.1rem; font-weight: 500; color: var(--ink-900); margin: 0; }
+.serif-value--lg { font-family: 'Lora', Georgia, serif; font-size: 1.4rem; font-weight: 500; color: var(--ink-900); margin: 0; }
+
+/* Pill filter buttons */
+.pill { padding: 5px 13px; border-radius: 9999px; border: 1px solid var(--cream-border); background: transparent; color: var(--ink-600); font-size: 12px; font-weight: 400; cursor: pointer; font-family: 'Inter', sans-serif; }
+.pill.active { border-color: var(--amber); background: var(--amber-subtle); color: var(--amber); font-weight: 500; }
+
+/* Back button */
+.back-btn { background: none; border: none; color: var(--ink-400); font-size: 12px; cursor: pointer; padding: 0; margin-bottom: 32px; font-family: 'Inter', sans-serif; display: flex; align-items: center; gap: 6px; }
+.back-btn:hover { color: var(--ink-700); }
+
+/* Toast */
+.toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); padding: 10px 18px; border-radius: 8px; font-size: 13px; font-family: 'Inter', sans-serif; pointer-events: none; z-index: 9999; white-space: nowrap; animation: toastIn 0.2s ease; }
+.toast--error { background: #3D1A1A; color: #F4BFBF; border: 1px solid #7A3030; }
+.toast--success { background: var(--ink-900); color: var(--cream); border: 1px solid var(--ink-700); }
+@keyframes toastIn { from { opacity:0; transform: translateX(-50%) translateY(8px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
