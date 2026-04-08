@@ -11,7 +11,7 @@ Works with **Kindle**, **Kobo**, **PocketBook**, and any other device supported 
 - **Statistics** — yearly heatmap, monthly breakdown, day-of-week patterns, top books
 - **Vocabulary** — every word you've looked up in KOReader with context sentence and one-click Merriam-Webster lookup
 - **Auto-sync** — syncs stats, covers, annotations, and vocabulary on a configurable interval
-- **Zero config SSH** — KoMark handles SSH key setup automatically on first connection
+- **SSH key auth** — uses your existing `~/.ssh` keys; auto-detects id_ed25519, id_rsa, id_ecdsa
 
 ## Installation
 
@@ -25,11 +25,17 @@ Download the latest `KoMark.dmg` from [Releases](../../releases), open it, and d
 
 Note the IP address shown.
 
-### 2. Open KoMark → Settings
+### 2. Copy your SSH public key to the device
 
-Enter your device's IP address and tap **Test Connection**. KoMark will handle SSH authentication automatically — no terminal required.
+```
+ssh-copy-id -p 2222 root@YOUR_DEVICE_IP
+```
 
-If your device has an SSH password set, enter it once. KoMark will configure key-based login and never ask again.
+Or if your device has a password, enter it in KoMark's Advanced settings instead.
+
+### 3. Open KoMark → Settings
+
+Enter your device's IP address and tap **Test Connection**.
 
 > **Tip:** Use **Find Device** to auto-discover your device on the network.
 

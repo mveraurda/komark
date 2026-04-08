@@ -3,71 +3,31 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 const zlib = require('zlib')
-const { ensureKeyPair } = require('./sshkey')
+const { getDefaultKeyPath } = require('./sshkey')
 
-let _userData = null
-function setUserData(p) { _userData = p }
-
-function makeConnOpts(settings, { usePassword = false } = {}) {
+function makeConnOpts(settings) {
   const connOpts = {
     host: settings.host, port: settings.port || 2222,
     username: settings.username || 'root',
     readyTimeout: 10000, retries: 1,
   }
-  if (usePassword) {
-    // Password auth for initial key upload — blank password works on most KOReader devices
-    connOpts.password = settings.password || ''
+  if (settings.password) {
+    connOpts.password = settings.password
   } else {
-    // Always prefer app-managed key
-    if (_userData) {
-      const { privateKey } = ensureKeyPair(_userData)
-      connOpts.privateKey = privateKey
-    }
-    // Fallback to user-specified or auto-detected system key
-    if (!connOpts.privateKey) {
-      const keyPaths = settings.sshKeyPath
-        ? [settings.sshKeyPath.replace(/^~/, os.homedir())]
-        : ['id_ed25519', 'id_rsa', 'id_ecdsa'].map(k => path.join(os.homedir(), '.ssh', k))
-      for (const kp of keyPaths) {
-        if (fs.existsSync(kp)) { connOpts.privateKey = fs.readFileSync(kp); break }
-      }
+    const keyPath = settings.sshKeyPath
+      ? settings.sshKeyPath.replace(/^~/, os.homedir())
+      : getDefaultKeyPath()
+    if (keyPath && fs.existsSync(keyPath)) {
+      connOpts.privateKey = fs.readFileSync(keyPath)
     }
   }
   return connOpts
 }
 
-// Try key auth first; if it fails, upload our public key via password auth then retry
-async function connectWithAutoSetup(sftp, settings) {
-  // First attempt: key auth
-  try {
-    await sftp.connect(makeConnOpts(settings))
-    return
-  } catch (e) {
-    if (!e.message?.includes('authentication') && !e.message?.includes('All configured') && !e.message?.includes('handshake')) throw e
-  }
-  // Key auth failed — upload our public key via password
-  const sftp2 = new SftpClient()
-  try {
-    await sftp2.connect(makeConnOpts(settings, { usePassword: true }))
-    const { publicKey } = ensureKeyPair(_userData)
-    const authKeysPath = '/mnt/us/koreader/settings/SSH/authorized_keys'
-    // Read existing keys if any, append ours if not already there
-    let existing = ''
-    try { existing = (await sftp2.get(authKeysPath)).toString() } catch {}
-    if (!existing.includes('komark')) {
-      await sftp2.put(Buffer.from(existing + publicKey), authKeysPath)
-    }
-  } finally {
-    await sftp2.end().catch(() => {})
-  }
-  // Second attempt: key auth should work now
-  await sftp.connect(makeConnOpts(settings))
-}
-
 async function performSync(settings, localPath) {
   const sftp = new SftpClient()
   try {
-    await connectWithAutoSetup(sftp, settings)
+    await sftp.connect(makeConnOpts(settings))
     const remote = settings.remotePath || '/mnt/us/koreader/settings/statistics.sqlite3'
     const tmp = localPath + '.tmp'
     await sftp.fastGet(remote, tmp)
@@ -118,7 +78,6 @@ function parseZip(buf) {
   while (offset + 30 < buf.length) {
     const sig = buf.readUInt32LE(offset)
     if (sig !== 0x04034b50) {
-      // Not a local file header — scan forward for next one
       let found = false
       for (let i = offset + 1; i < buf.length - 4; i++) {
         if (buf.readUInt32LE(i) === 0x04034b50) { offset = i; found = true; break }
@@ -146,9 +105,7 @@ function parseZip(buf) {
 // Validate image bytes — check magic bytes for JPEG or PNG
 function isValidImage(buf) {
   if (!buf || buf.length < 8) return false
-  // JPEG: FF D8 FF
   if (buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF) return buf.length > 1000
-  // PNG: 89 50 4E 47
   if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) return buf.length > 1000
   return false
 }
@@ -171,12 +128,10 @@ function extractEpubCover(epubBytes) {
     function resolve(href) {
       if (!href) return null
       const full = href.startsWith('/') ? href.slice(1) : opfDir + href
-      // Also try URL-decoded version
       const decoded = decodeURIComponent(full)
       return files[full] || files[decoded] || files[href] || null
     }
 
-    // Strategy 1: <meta name="cover" content="id"/> → find item with that id
     const coverMetaMatch = opfStr.match(/name="cover"\s+content="([^"]+)"/i) ||
                            opfStr.match(/content="([^"]+)"\s+name="cover"/i)
     if (coverMetaMatch) {
@@ -189,7 +144,6 @@ function extractEpubCover(epubBytes) {
       }
     }
 
-    // Strategy 2: item with id containing "cover" and media-type image
     const coverItemMatch = opfStr.match(/id="[^"]*cover[^"]*"[^>]*href="([^"]+\.(jpg|jpeg|png))/i) ||
                            opfStr.match(/href="([^"]+\.(jpg|jpeg|png))[^"]*"[^>]*id="[^"]*cover[^"]*"/i)
     if (coverItemMatch) {
@@ -197,7 +151,6 @@ function extractEpubCover(epubBytes) {
       if (isValidImage(img)) return img
     }
 
-    // Strategy 3: first image in spine order (look at all image items, pick largest)
     const imgMatches = [...opfStr.matchAll(/href="([^"]+\.(jpg|jpeg|png))"/gi)]
     let best = null, bestSize = 0
     for (const m of imgMatches) {
@@ -214,7 +167,7 @@ async function syncCovers(settings, coversDir) {
   if (!fs.existsSync(coversDir)) fs.mkdirSync(coversDir, { recursive: true })
   const sftp = new SftpClient()
   try {
-    await connectWithAutoSetup(sftp, settings)
+    await sftp.connect(makeConnOpts(settings))
     const sdrFiles = await findSdrFiles(sftp, '/mnt/us/books')
 
     for (const { lua, ext } of sdrFiles) {
@@ -226,7 +179,6 @@ async function syncCovers(settings, coversDir) {
         if (!md5) continue
 
         const coverPath = path.join(coversDir, md5 + '.jpg')
-        // Skip if already cached and valid
         if (fs.existsSync(coverPath) && fs.statSync(coverPath).size > 1000) continue
 
         const sdrDir = lua.slice(0, lua.lastIndexOf('/'))
@@ -245,7 +197,6 @@ async function syncCovers(settings, coversDir) {
   }
 }
 
-// Parse annotations array from lua metadata file — only real highlights (have pos0/pos1)
 function parseAnnotations(content, md5) {
   const annotations = []
   const block = content.match(/\["annotations"\]\s*=\s*\{([\s\S]*?)\},\s*\["cache/)
@@ -253,11 +204,9 @@ function parseAnnotations(content, md5) {
   const inner = block[1]
   const entries = inner.split(/\[\d+\]\s*=\s*\{/)
   for (const entry of entries.slice(1)) {
-    // Only process real highlights — they have pos0/pos1 fields
     if (!entry.includes('"pos0"')) continue
     const get = (key) => {
-      // Handle multi-line strings with \n
-      const m = entry.match(new RegExp(`\\["${key}"\\]\\s*=\\s*"((?:[^"\\\\]|\\\\.)*)"`))
+      const m = entry.match(new RegExp(`\\["${key}"\\]\\s*=\\s*"((?:[^"\\\\]|\\\\.)*)"`) )
       return m ? m[1].replace(/\\n/g, '\n').replace(/\\\\/g, '\\') : null
     }
     const getNum = (key) => { const m = entry.match(new RegExp(`\\["${key}"\\]\\s*=\\s*(\\d+)`)); return m ? parseInt(m[1]) : null }
@@ -279,7 +228,7 @@ async function syncAnnotations(settings, annotationsPath) {
   const sftp = new SftpClient()
   const allAnnotations = []
   try {
-    await connectWithAutoSetup(sftp, settings)
+    await sftp.connect(makeConnOpts(settings))
     const sdrFiles = await findSdrFiles(sftp, '/mnt/us/books')
     for (const { lua } of sdrFiles) {
       try {
@@ -301,11 +250,10 @@ async function syncAnnotations(settings, annotationsPath) {
 async function syncVocab(settings, vocabPath) {
   const sftp = new SftpClient()
   try {
-    await connectWithAutoSetup(sftp, settings)
+    await sftp.connect(makeConnOpts(settings))
     const remote = '/mnt/us/koreader/settings/vocabulary_builder.sqlite3'
     const tmp = vocabPath + '.tmp'
     await sftp.fastGet(remote, tmp)
-    // Also grab WAL and SHM files so the DB is complete
     try { await sftp.fastGet(remote + '-wal', tmp + '-wal') } catch {}
     try { await sftp.fastGet(remote + '-shm', tmp + '-shm') } catch {}
     fs.renameSync(tmp, vocabPath)
@@ -316,4 +264,4 @@ async function syncVocab(settings, vocabPath) {
   }
 }
 
-module.exports = { performSync, syncCovers, syncAnnotations, syncVocab, setUserData }
+module.exports = { performSync, syncCovers, syncAnnotations, syncVocab }

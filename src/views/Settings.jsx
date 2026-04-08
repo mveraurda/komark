@@ -73,10 +73,6 @@ export default function Settings({ onSaved }) {
         {finding && scanSubnet && <p style={{margin:'6px 0 0',fontSize:11,color:'var(--ink-400)',fontFamily:'ui-monospace,monospace'}}>Scanning {scanSubnet}.x…</p>}
       </Field>
 
-      <Field label="Password" hint="Only needed on first connection — KoMark sets up automatic login after that. Leave blank if your device has no password (most Kindles).">
-        <Input value={form.password} onChange={v=>set('password',v)} placeholder="leave blank if none" type="password" mono/>
-      </Field>
-
       <div style={{marginBottom:18}}>
         <button onClick={()=>setShowAdvanced(v=>!v)} style={{background:'none',border:'none',padding:0,fontSize:12,color:'var(--ink-400)',cursor:'pointer',fontFamily:'Inter,sans-serif'}}>
           {showAdvanced ? '▾ Hide advanced' : '▸ Advanced options'}
@@ -90,6 +86,12 @@ export default function Settings({ onSaved }) {
           </Field>
           <Field label="Username" hint="Usually 'root'">
             <Input value={form.username} onChange={v=>set('username',v)} placeholder="root" mono/>
+          </Field>
+          <Field label="Password" hint="Only needed if your device has a password set. Leave blank to use SSH key auth.">
+            <Input value={form.password} onChange={v=>set('password',v)} placeholder="leave blank if none" type="password" mono/>
+          </Field>
+          <Field label="SSH Key Path" hint="Leave blank to auto-detect (~/.ssh/id_ed25519, id_rsa, id_ecdsa)">
+            <Input value={form.sshKeyPath} onChange={v=>set('sshKeyPath',v)} placeholder="~/.ssh/id_ed25519" mono/>
           </Field>
           <Field label="Statistics File Path" hint="Only change if KOReader stores files in a non-standard location">
             <Input value={form.remotePath} onChange={v=>set('remotePath',v)} placeholder="/mnt/us/koreader/settings/statistics.sqlite3" mono/>
@@ -106,12 +108,13 @@ export default function Settings({ onSaved }) {
       </Field>
 
       <div style={{padding:'14px 18px',background:'var(--amber-subtle)',border:'1px solid var(--amber-light)',borderRadius:8,marginBottom:24}}>
-        <p style={{margin:'0 0 6px',fontSize:12,fontWeight:500,color:'var(--amber)'}}>How to enable SSH on KOReader</p>
+        <p style={{margin:'0 0 6px',fontSize:12,fontWeight:500,color:'var(--amber)'}}>How to connect</p>
         <ol style={{margin:0,padding:'0 0 0 16px',fontSize:12,color:'var(--ink-700)',lineHeight:1.9}}>
-          <li>Open KOReader on your device</li>
-          <li>Tap ☰ → Tools (⚙) → Network</li>
-          <li>Enable <em>SSH Server</em> — note the IP shown</li>
-          <li>Enter that IP above and tap Test Connection</li>
+          <li>Enable SSH on KOReader: ☰ → Tools (⚙) → Network → SSH Server</li>
+          <li>Copy your SSH public key to the device:<br/>
+            <code style={{fontSize:11,background:'var(--cream-dark)',padding:'2px 6px',borderRadius:4}}>ssh-copy-id -p 2222 root@YOUR_DEVICE_IP</code>
+          </li>
+          <li>Enter the IP above and tap Test Connection</li>
         </ol>
       </div>
 
