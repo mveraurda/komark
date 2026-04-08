@@ -19,6 +19,10 @@ if (fs.existsSync(DMG_PATH))  fs.unlinkSync(DMG_PATH)
 if (fs.existsSync(STAGING))   fs.rmSync(STAGING, { recursive: true })
 fs.mkdirSync(STAGING)
 
+// Ad-hoc sign the app so macOS shows "Open Anyway" instead of "damaged"
+console.log('Signing app (ad-hoc)...')
+execSync(`codesign --force --deep --sign - "${APP_PATH}"`, { stdio: 'inherit' })
+
 console.log('Staging DMG contents...')
 
 // Copy .app into staging folder
