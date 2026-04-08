@@ -111,8 +111,9 @@ export default function Settings({ onSaved }) {
         <p style={{margin:'0 0 6px',fontSize:12,fontWeight:500,color:'var(--amber)'}}>How to connect</p>
         <ol style={{margin:0,padding:'0 0 0 16px',fontSize:12,color:'var(--ink-700)',lineHeight:1.9}}>
           <li>Enable SSH on KOReader: ☰ → Tools (⚙) → Network → SSH Server</li>
-          <li>Copy your SSH public key to the device:<br/>
-            <code style={{fontSize:11,background:'var(--cream-dark)',padding:'2px 6px',borderRadius:4}}>ssh-copy-id -p 2222 root@YOUR_DEVICE_IP</code>
+          <li>Add your Mac's public key to the device — on KOReader go to:<br/>
+            <code style={{fontSize:11,background:'var(--cream-dark)',padding:'2px 6px',borderRadius:4}}>/mnt/us/koreader/settings/SSH/authorized_keys</code>
+            <br/><span style={{fontSize:11,color:'var(--ink-400)'}}>Your Mac's public key is at <code style={{background:'var(--cream-dark)',padding:'1px 4px',borderRadius:3}}>~/.ssh/id_ed25519.pub</code></span>
           </li>
           <li>Enter the IP above and tap Test Connection</li>
         </ol>
